@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+import urllib.parse  # ДОБАВЛЕНО ДЛЯ URL-КОДИРОВАНИЯ
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 
@@ -342,10 +343,12 @@ def main():
         
         logger.info("✅ Приложение создано")
         
-        # ========== ИСПРАВЛЕНИЕ ДЛЯ RAILWAY ==========
-        # Telegram токен содержит ':', что ломает URL в Railway
-        # Используем только первую часть токена (ID бота)
-        url_path = TOKEN.split(':')[0]  # "8514815854"
+        # ========== КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: URL-КОДИРОВАНИЕ ТОКЕНА ==========
+        # Telegram отправляет запросы на полный токен с ':', который нужно URL-кодировать
+        # Пример токена: "8514815854:AAH2CVbpxaPTTNtcdHj8j9lcbYa2zgBoVn8"
+        # URL-кодированная версия: "8514815854%3AAH2CVbpxaPTTNtcdHj8j9lcbYa2zgBoVn8"
+        
+        url_path = urllib.parse.quote(TOKEN, safe='')  # Кодируем ВЕСЬ токен
         
         domain = os.environ.get("RAILWAY_STATIC_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
         
@@ -363,7 +366,7 @@ def main():
         application.run_webhook(
             listen="0.0.0.0",
             port=PORT,
-            url_path=url_path,  # ТОЛЬКО ЧИСЛА!
+            url_path=url_path,  # URL-кодированный токен
             webhook_url=webhook_url,
             drop_pending_updates=True
         )
