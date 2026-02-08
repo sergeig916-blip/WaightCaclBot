@@ -2,7 +2,7 @@ import os
 import re
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 
 # ========== НАСТРОЙКИ ==========
 TOKEN = os.environ.get("BOT_TOKEN", "8514815854:AAH2CVbpxaPTTNtcdHj8j9lcbYa2zgBoVn8")
@@ -85,7 +85,7 @@ def parse_workout_data(text):
     return results
 
 # ========== КОМАНДА /START ==========
-def start_command(update: Update, context: CallbackContext):
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     keyboard = [
@@ -95,19 +95,19 @@ def start_command(update: Update, context: CallbackContext):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    update.message.reply_text(
+    await update.message.reply_text(
         "🏋️ БОТ ДЛЯ РАСЧЕТА ВЕСОВ\n\nВыберите упражнение:",
         reply_markup=reply_markup
     )
 
 # ========== КОМАНДА /MAX ==========
-def max_command(update: Update, context: CallbackContext):
+async def max_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     жим_макс = get_user_max(user_id, "жим")
     присед_макс = get_user_max(user_id, "присед")
     
-    update.message.reply_text(
+    await update.message.reply_text(
         f"🏋️ ВАШИ МАКСИМУМЫ:\n\n"
         f"• Жим: {жим_макс} кг\n"
         f"• Присед: {присед_макс} кг\n\n"
@@ -115,9 +115,9 @@ def max_command(update: Update, context: CallbackContext):
     )
 
 # ========== ОБРАБОТКА КНОПОК ==========
-def button_handler(update: Update, context: CallbackContext):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
     
     user_id = query.from_user.id
     data = query.data
@@ -134,7 +134,7 @@ def button_handler(update: Update, context: CallbackContext):
             [InlineKeyboardButton("🔙 НАЗАД", callback_data='back_start')]
         ]
         
-        query.edit_message_text(text=max_text, reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.edit_message_text(text=max_text, reply_markup=InlineKeyboardMarkup(keyboard))
     
     elif data.startswith('change_'):
         exercise = data.split('_')[1]
@@ -143,7 +143,7 @@ def button_handler(update: Update, context: CallbackContext):
         context.user_data['changing_exercise'] = exercise
         context.user_data['awaiting_max_input'] = True
         
-        query.edit_message_text(
+        await query.edit_message_text(
             f"📝 Изменение максимума для {exercise.upper()}\n\nТекущий: {current_max} кг\nВведите новый вес (например: 120 или 122.5):",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ОТМЕНА", callback_data='back_max')]])
         )
@@ -160,7 +160,7 @@ def button_handler(update: Update, context: CallbackContext):
             [InlineKeyboardButton("🔙 НАЗАД К ВЫБОРУ", callback_data='back_start')]
         ]
         
-        query.edit_message_text(text=max_text, reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.edit_message_text(text=max_text, reply_markup=InlineKeyboardMarkup(keyboard))
     
     elif data == 'back_start':
         keyboard = [
@@ -169,7 +169,7 @@ def button_handler(update: Update, context: CallbackContext):
             [InlineKeyboardButton("📊 МАКСИМУМЫ", callback_data='show_max')]
         ]
         
-        query.edit_message_text(
+        await query.edit_message_text(
             text="🏋️ БОТ ДЛЯ РАСЧЕТА ВЕСОВ\n\nВыберите упражнение:",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -180,13 +180,13 @@ def button_handler(update: Update, context: CallbackContext):
         context.user_data['awaiting_data'] = True
         context.user_data['awaiting_max_input'] = False
         
-        query.edit_message_text(
+        await query.edit_message_text(
             f"📝 Выбран: {exercise.upper()}\n\nВведите данные (примеры):\n• 50-3;60-3-3;85-3-5\n• 50 3 60 3 3 85 3 5\n• 50-3 60-3-3 85-3-5",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ВЫБРАТЬ ДРУГОЕ", callback_data='back_start')]])
         )
 
 # ========== ОБРАБОТКА СООБЩЕНИЙ ==========
-def handle_message(update: Update, context: CallbackContext):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
     
@@ -197,7 +197,7 @@ def handle_message(update: Update, context: CallbackContext):
             new_max = float(text.replace(',', '.'))
             
             if not (1 <= new_max <= 300):
-                update.message.reply_text("❌ Вес должен быть от 1 до 300 кг!")
+                await update.message.reply_text("❌ Вес должен быть от 1 до 300 кг!")
                 return
             
             set_user_max(user_id, exercise, new_max)
@@ -205,7 +205,7 @@ def handle_message(update: Update, context: CallbackContext):
             жим_макс = get_user_max(user_id, "жим")
             присед_макс = get_user_max(user_id, "присед")
             
-            update.message.reply_text(f"✅ Максимум для {exercise.upper()} изменен на {new_max} кг!")
+            await update.message.reply_text(f"✅ Максимум для {exercise.upper()} изменен на {new_max} кг!")
             
             max_text = f"🏋️ ОБНОВЛЕННЫЕ МАКСИМУМЫ:\n\n• Жим: {жим_макс} кг\n• Присед: {присед_макс} кг"
             
@@ -214,12 +214,12 @@ def handle_message(update: Update, context: CallbackContext):
                 [InlineKeyboardButton("🔙 К ВЫБОРУ УПРАЖНЕНИЙ", callback_data='back_start')]
             ]
             
-            update.message.reply_text(text=max_text, reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.message.reply_text(text=max_text, reply_markup=InlineKeyboardMarkup(keyboard))
             
             context.user_data['awaiting_max_input'] = False
             
         except ValueError:
-            update.message.reply_text("❌ Неверный формат! Введите число (например: 120 или 122.5):")
+            await update.message.reply_text("❌ Неверный формат! Введите число (например: 120 или 122.5):")
         return
     
     if context.user_data.get('awaiting_data'):
@@ -229,7 +229,7 @@ def handle_message(update: Update, context: CallbackContext):
         workouts = parse_workout_data(text)
         
         if not workouts:
-            update.message.reply_text(
+            await update.message.reply_text(
                 "❌ Не понял формат. Пример: 50-3;60-3-3;85-3-5",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ВЫБРАТЬ ДРУГОЕ", callback_data='back_start')]])
             )
@@ -237,7 +237,7 @@ def handle_message(update: Update, context: CallbackContext):
         
         try:
             # 1. ЗАГОЛОВОК
-            update.message.reply_text(f"🏋️ РАСЧЕТ ВЕСОВ\n📊 {exercise.upper()}")
+            await update.message.reply_text(f"🏋️ РАСЧЕТ ВЕСОВ\n📊 {exercise.upper()}")
             
             # 2. ОСНОВНЫЕ ЦИФРЫ
             result_text = ""
@@ -254,8 +254,8 @@ def handle_message(update: Update, context: CallbackContext):
                     result_text += f"{i}. {rounded} × {reps} × {sets}\n"
                     details_text += f"{i}. {percent}% = {exact:.1f} кг → {rounded} кг ({reps}×{sets})\n"
             
-            update.message.reply_text(result_text.strip())
-            update.message.reply_text(details_text + f"\n⚙️ Округление до 2.5 кг")
+            await update.message.reply_text(result_text.strip())
+            await update.message.reply_text(details_text + f"\n⚙️ Округление до 2.5 кг")
             
             # 3. КНОПКИ ДЛЯ ПРОДОЛЖЕНИЯ
             keyboard = [
@@ -263,37 +263,49 @@ def handle_message(update: Update, context: CallbackContext):
                 [InlineKeyboardButton("📊 ИЗМЕНИТЬ МАКСИМУМЫ", callback_data='show_max')]
             ]
             
-            update.message.reply_text("✅ Расчет завершен!", reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.message.reply_text("✅ Расчет завершен!", reply_markup=InlineKeyboardMarkup(keyboard))
             
             context.user_data['awaiting_data'] = False
             
         except Exception as e:
             logger.error(f"Ошибка расчета: {e}")
-            update.message.reply_text(
+            await update.message.reply_text(
                 "❌ Ошибка расчета. Попробуйте другой формат:",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ВЫБРАТЬ ДРУГОЕ", callback_data='back_start')]])
             )
 
+# ========== ОБРАБОТКА ОШИБОК ==========
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ошибок"""
+    logger.error(f"Ошибка: {context.error}")
+    if update.callback_query:
+        await update.callback_query.answer("⚠️ Произошла ошибка. Попробуйте /start")
+
 # ========== ЗАПУСК БОТА ==========
 def main():
-    """Запуск бота (как в Жим 150)"""
+    """Запуск бота на Railway"""
     logger.info("🚀 Запуск бота для расчета весов...")
     
-    # Создаем Updater (старая версия API)
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
-    
-    # Регистрируем обработчики
-    dp.add_handler(CommandHandler("start", start_command))
-    dp.add_handler(CommandHandler("max", max_command))
-    dp.add_handler(CallbackQueryHandler(button_handler))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    
-    logger.info("✅ Бот запущен в режиме polling!")
-    
-    # ЗАПУСК В РЕЖИМЕ POLLING (как в Жим 150)
-    updater.start_polling()
-    updater.idle()
+    try:
+        # Создаем Application для версии 21.0
+        application = Application.builder().token(TOKEN).build()
+        
+        # Регистрируем обработчики
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(CommandHandler("max", max_command))
+        application.add_handler(CallbackQueryHandler(button_handler))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_error_handler(error_handler)
+        
+        logger.info("✅ Бот запущен в режиме polling!")
+        logger.info("🤖 Бот готов к работе!")
+        
+        # ЗАПУСК В РЕЖИМЕ POLLING
+        application.run_polling()
+        
+    except Exception as e:
+        logger.error(f"💥 Критическая ошибка: {e}")
+        raise
 
 if __name__ == "__main__":
     main()
