@@ -16,10 +16,9 @@ logger = logging.getLogger(__name__)
 
 # ========== ГЛОБАЛЬНЫЕ ДАННЫЕ ==========
 USER_MAX_WEIGHTS = {}
-CALCULATION_HISTORY = {}  # user_id: {"exercise": str, "workouts": list, "max_weight": float}
+CALCULATION_HISTORY = {}
 
 def get_user_max(user_id, exercise):
-    """Получить максимум пользователя или значение по умолчанию"""
     if user_id not in USER_MAX_WEIGHTS:
         USER_MAX_WEIGHTS[user_id] = {
             "жим": 117.5,
@@ -30,7 +29,6 @@ def get_user_max(user_id, exercise):
     return USER_MAX_WEIGHTS[user_id].get(exercise, 100)
 
 def set_user_max(user_id, exercise, value):
-    """Установить максимум пользователя"""
     if user_id not in USER_MAX_WEIGHTS:
         USER_MAX_WEIGHTS[user_id] = {}
     USER_MAX_WEIGHTS[user_id][exercise] = value
@@ -39,7 +37,6 @@ def set_user_max(user_id, exercise, value):
 
 # ========== ПАРСЕР ==========
 def parse_workout_data(text):
-    """Парсинг данных тренировки"""
     text = text.strip()
     parts = [p.strip() for p in text.split(';') if p.strip()]
     results = []
@@ -91,7 +88,6 @@ def parse_workout_data(text):
 
 # ========== КОМАНДА /START ==========
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало работы с ботом"""
     keyboard = [
         [InlineKeyboardButton("🏋️ ЖИМ", callback_data='exercise_жим')],
         [InlineKeyboardButton("🦵 ПРИСЕД", callback_data='exercise_присед')],
@@ -107,7 +103,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== КОМАНДА /MAX ==========
 async def max_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показать текущие максимумы"""
     user_id = update.effective_user.id
     
     жим_макс = get_user_max(user_id, "жим")
@@ -124,7 +119,6 @@ async def max_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== ГЛАВНОЕ МЕНЮ ==========
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показать главное меню"""
     keyboard = [
         [InlineKeyboardButton("🏋️ ЖИМ", callback_data='exercise_жим')],
         [InlineKeyboardButton("🦵 ПРИСЕД", callback_data='exercise_присед')],
@@ -146,7 +140,6 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== МЕНЮ МАКСИМУМОВ ==========
 async def show_max_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Меню максимумов с инструкциями"""
     user_id = update.effective_user.id
     
     жим_макс = get_user_max(user_id, "жим")
@@ -181,7 +174,6 @@ async def show_max_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== ИНСТРУКЦИИ ==========
 async def show_instructions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показать инструкции"""
     instructions_text = (
         "📖 ИНСТРУКЦИИ ПО ФОРМАТАМ ВВОДА:\n\n"
         "📌 Форматы данных:\n"
@@ -251,11 +243,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['awaiting_data'] = True
         context.user_data['awaiting_max_input'] = False
         
-        # Сохраняем выбранное упражнение для истории
-        if user_id not in CALCULATION_HISTORY:
-            CALCULATION_HISTORY[user_id] = {}
-        CALCULATION_HISTORY[user_id]['last_exercise'] = exercise
-        
         exercise_name = ""
         if exercise == "жим":
             exercise_name = "ЖИМ ЛЕЖА"
@@ -267,6 +254,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             f"📝 Выбран: {exercise_name}"
         )
+    
+    # ДЕТАЛИ РАСЧЕТА (ДОБАВЛЕН ОТДЕЛЬНЫЙ ОБРАБОТЧИК)
+    elif data == 'show_details':
+        await show_calculation_details(update, context)
 
 # ========== ПОКАЗАТЬ ДЕТАЛИ РАСЧЕТА ==========
 async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -278,7 +269,7 @@ async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT
     
     if user_id not in CALCULATION_HISTORY or 'last_calculation' not in CALCULATION_HISTORY[user_id]:
         await query.edit_message_text(
-            text="❌ Нет данных о последнем расчете",
+            text="❌ Нет данных о последнем расчете. Сначала сделайте расчет.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 НАЗАД", callback_data='back_main')]
             ])
@@ -345,7 +336,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await update.message.reply_text(f"✅ Максимум для {exercise.upper()} изменен на {new_max} кг!")
             
-            # Показываем обновленные максимумы
             max_text = (
                 f"🏋️ ОБНОВЛЕННЫЕ МАКСИМУМЫ:\n\n"
                 f"• Жим: {жим_макс} кг\n"
@@ -389,6 +379,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Сохраняем данные расчета для кнопки "Детали"
             if user_id not in CALCULATION_HISTORY:
                 CALCULATION_HISTORY[user_id] = {}
+            
             CALCULATION_HISTORY[user_id]['last_calculation'] = {
                 'exercise': exercise,
                 'max_weight': max_weight,
@@ -446,33 +437,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== ОБРАБОТКА ОШИБОК ==========
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка ошибок"""
     logger.error(f"Ошибка: {context.error}")
-    
-    try:
-        if update.callback_query:
-            await update.callback_query.answer("⚠️ Произошла ошибка. Попробуйте /start")
-    except:
-        pass
+    if update.callback_query:
+        await update.callback_query.answer("⚠️ Произошла ошибка. Попробуйте /start")
 
 # ========== ЗАПУСК БОТА ==========
 def main():
-    """Запуск бота на Railway"""
     logger.info("🚀 Запуск бота для расчета весов...")
     
     try:
-        # Создаем Application
         application = Application.builder().token(TOKEN).build()
         
-        # Регистрируем обработчики
+        # Регистрируем обработчики В ПРАВИЛЬНОМ ПОРЯДКЕ
         application.add_handler(CommandHandler("start", start_command))
         application.add_handler(CommandHandler("max", max_command))
         
         # Обработка кнопок
         application.add_handler(CallbackQueryHandler(button_handler))
-        
-        # Обработка кнопки "Детали"
-        application.add_handler(CallbackQueryHandler(show_calculation_details, pattern='^show_details$'))
         
         # Обработка ввода данных
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -483,7 +464,6 @@ def main():
         logger.info("✅ Бот запущен в режиме polling!")
         logger.info("🤖 Бот готов к работе!")
         
-        # ЗАПУСК В РЕЖИМЕ POLLING
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
             drop_pending_updates=True,
