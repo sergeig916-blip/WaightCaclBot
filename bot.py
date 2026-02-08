@@ -330,7 +330,7 @@ def main():
     logger.info("🚀 Запуск бота для расчета весов...")
     
     try:
-        # Создаем Application (вместо Updater)
+        # Создаем Application
         application = Application.builder().token(TOKEN).build()
         
         # Регистрируем обработчики
@@ -338,32 +338,32 @@ def main():
         application.add_handler(CommandHandler("max", max_command))
         application.add_handler(CallbackQueryHandler(button_handler))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        
-        # Обработчик ошибок
         application.add_error_handler(error_handler)
         
         logger.info("✅ Приложение создано")
         
-        # ========== ВАЖНО: ПРАВИЛЬНЫЙ URL ДЛЯ RAILWAY ==========
-        # Railway автоматически задает RAILWAY_STATIC_URL или RAILWAY_PUBLIC_DOMAIN
+        # ========== ИСПРАВЛЕНИЕ ДЛЯ RAILWAY ==========
+        # Telegram токен содержит ':', что ломает URL в Railway
+        # Используем только первую часть токена (ID бота)
+        url_path = TOKEN.split(':')[0]  # "8514815854"
+        
         domain = os.environ.get("RAILWAY_STATIC_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
         
         if domain:
-            # Убираем протокол если есть
             domain = domain.replace("https://", "").replace("http://", "")
-            webhook_url = f"https://{domain}/{TOKEN}"
+            webhook_url = f"https://{domain}/{url_path}"
         else:
-            # Если переменных нет, используем дефолтный шаблон Railway
-            webhook_url = f"https://{os.environ.get('RAILWAY_SERVICE_NAME', 'raschet-vesov')}.up.railway.app/{TOKEN}"
+            webhook_url = f"https://WaightCaclBot.up.railway.app/{url_path}"
         
         logger.info(f"🌐 Webhook URL: {webhook_url}")
+        logger.info(f"📁 URL Path: /{url_path}")
         logger.info(f"🚀 Бот запускается на порту {PORT}")
         
-        # ЗАПУСК В РЕЖИМЕ WEBHOOK (для Railway)
+        # ЗАПУСК В РЕЖИМЕ WEBHOOK
         application.run_webhook(
             listen="0.0.0.0",
             port=PORT,
-            url_path=TOKEN,
+            url_path=url_path,  # ТОЛЬКО ЧИСЛА!
             webhook_url=webhook_url,
             drop_pending_updates=True
         )
