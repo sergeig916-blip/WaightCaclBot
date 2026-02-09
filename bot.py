@@ -200,7 +200,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif data == 'new_calculation':
-        await query.edit_message_text(
+        # Отправляем НОВОЕ сообщение вместо редактирования старого
+        await context.bot.send_message(
+            chat_id=user_id,
             text="Выберите упражнение:",
             reply_markup=get_exercises_keyboard()
         )
@@ -239,7 +241,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['awaiting_data'] = True
         context.user_data['awaiting_max_input'] = False
         
-        # Убрал текст про формат - просто ждем ввода данных
         exercise_name = {"жим": "ЖИМ ЛЕЖА", "присед": "ПРИСЕДАНИЕ", "тяга": "СТАНОВАЯ ТЯГА"}.get(exercise, "")
         await query.edit_message_text(f"📝 {exercise_name}")
     
@@ -320,18 +321,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         try:
-            # Сохраняем историю расчетов (не удаляем старые!)
             if user_id not in CALCULATION_HISTORY:
                 CALCULATION_HISTORY[user_id] = {}
             
-            # Сохраняем новый расчет, сохраняя старые
             CALCULATION_HISTORY[user_id]['last_calculation'] = {
                 'exercise': exercise,
                 'max_weight': max_weight,
                 'workouts': workouts
             }
             
-            # Только результат расчета (без названия упражнения)
             result_parts = []
             for percent, reps, sets in workouts:
                 exact = max_weight * (percent / 100)
@@ -343,7 +341,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             result_line = "; ".join(result_parts)
             
-            # Кнопки после расчета
             keyboard = [
                 [InlineKeyboardButton("🔄 НОВЫЙ РАСЧЁТ", callback_data='new_calculation')],
                 [InlineKeyboardButton("🔍 ДЕТАЛИ/ОКРУГЛЕНИЯ", callback_data='show_details')],
@@ -351,7 +348,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("🔙 НАЗАД В МЕНЮ", callback_data='back_to_main')]
             ]
             
-            # Отправляем только результат и кнопки
             await update.message.reply_text(
                 result_line,
                 reply_markup=InlineKeyboardMarkup(keyboard)
