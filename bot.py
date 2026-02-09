@@ -548,19 +548,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             result_line = "; ".join(result_parts)
             
-            # Отправляем результат
+            # Отправляем только название упражнения и результат
             await update.message.reply_text(exercise_name)
             await update.message.reply_text(result_line)
             
-            # 3. КНОПКИ ДЛЯ ПРОДОЛЖЕНИЯ
+            # 3. КНОПКИ ДЛЯ ПРОДОЛЖЕНИЯ - БЕЗ ЛИШНИХ СООБЩЕНИЙ
             keyboard = [
                 [InlineKeyboardButton("🔄 НОВЫЙ РАСЧЁТ", callback_data='back_to_main')],
                 [InlineKeyboardButton("🔍 ДЕТАЛИ/ОКРУГЛЕНИЯ", callback_data='show_details')],
                 [InlineKeyboardButton("📊 ИЗМЕНИТЬ МАКСИМУМЫ", callback_data='menu_max')]
             ]
             
+            # Отправляем inline клавиатуру без текста
             await update.message.reply_text(
-                "✅ Расчет завершен!",
+                text="",  # Пустой текст
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
             
