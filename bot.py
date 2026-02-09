@@ -44,7 +44,13 @@ def get_main_keyboard():
         [KeyboardButton("🏋️ НАЧАТЬ РАСЧЁТ"), KeyboardButton("📊 МАКСИМУМЫ")],
         [KeyboardButton("❓ ПОМОЩЬ"), KeyboardButton("ℹ️ О БОТЕ")]
     ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True,
+        is_persistent=True,
+        one_time_keyboard=False,
+        selective=True
+    )
 
 def get_exercises_keyboard():
     """Клавиатура для выбора упражнений"""
@@ -225,6 +231,38 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_main_keyboard()
         )
 
+# ========== ОБРАБОТКА ЛЮБЫХ СООБЩЕНИЙ БЕЗ КОМАНД ==========
+async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка любого сообщения без команды - предлагает /start"""
+    user_id = update.effective_user.id
+    text = update.message.text.strip()
+    
+    # Игнорируем команды
+    if text.startswith('/'):
+        return
+    
+    # Игнорируем кнопки меню
+    if text in ["🏋️ НАЧАТЬ РАСЧЁТ", "📊 МАКСИМУМЫ", "❓ ПОМОЩЬ", "ℹ️ О БОТЕ"]:
+        return
+    
+    # Показываем приветствие
+    welcome_text = (
+        "👋 Привет!\n\n"
+        "🤖 Я бот для расчета рабочих весов в пауэрлифтинге.\n\n"
+        "Чтобы начать работу, нажмите /start\n"
+        "Или используйте меню внизу экрана:\n"
+        "• 🏋️ НАЧАТЬ РАСЧЁТ - выбрать упражнение\n"
+        "• 📊 МАКСИМУМЫ - посмотреть/изменить максимумы\n"
+        "• ❓ ПОМОЩЬ - инструкции по использованию\n"
+        "• ℹ️ О БОТЕ - информация о боте\n\n"
+        "💪 Давайте начнем тренировку!"
+    )
+    
+    await update.message.reply_text(
+        welcome_text,
+        reply_markup=get_main_keyboard()
+    )
+
 # ========== ОБРАБОТКА INLINE КНОПОК ==========
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -385,9 +423,9 @@ async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# ========== ОБРАБОТКА СООБЩЕНИЙ ==========
+# ========== ОБРАБОТКА ВВОДА ДАННЫХ ДЛЯ РАСЧЕТА ==========
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка ввода данных"""
+    """Обработка ввода данных для расчета"""
     user_id = update.effective_user.id
     text = update.message.text.strip()
     
@@ -526,21 +564,42 @@ def main():
         # Создаем Application
         application = Application.builder().token(TOKEN).build()
         
-        # Регистрируем обработчики в правильном порядке
+        # ========== ПРАВИЛЬНЫЙ ПОРЯДОК ОБРАБОТЧИКОВ ==========
+        
+        # 1. Команды (самый высокий приоритет)
         application.add_handler(CommandHandler("start", start_command))
         application.add_handler(CommandHandler("max", max_command))
-        application.add_handler(MessageHandler(filters.Regex("^(🏋️ НАЧАТЬ РАСЧЁТ|📊 МАКСИМУМЫ|❓ ПОМОЩЬ|ℹ️ О БОТЕ)$"), handle_main_menu))
+        
+        # 2. Кнопки постоянного меню
+        application.add_handler(MessageHandler(
+            filters.Regex("^(🏋️ НАЧАТЬ РАСЧЁТ|📊 МАКСИМУМЫ|❓ ПОМОЩЬ|ℹ️ О БОТЕ)$"), 
+            handle_main_menu
+        ))
+        
+        # 3. Inline кнопки
         application.add_handler(CallbackQueryHandler(button_handler))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
+        # 4. Обработка ввода данных для расчета
+        application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND, 
+            handle_message
+        ))
+        
+        # 5. Обработчик любых сообщений (САМЫЙ НИЗКИЙ приоритет!)
+        # Добавляем в группу 1 для низкого приоритета
+        application.add_handler(MessageHandler(
+            filters.ALL & ~filters.COMMAND, 
+            handle_any_message
+        ), group=1)
+        
+        # 6. Обработчик ошибок
         application.add_error_handler(error_handler)
         
         logger.info("✅ Бот запущен в режиме polling!")
         logger.info("🤖 Бот готов к работе!")
         
-        # ЗАПУСК В РЕЖИМЕ POLLING (чистый запуск)
-        application.run_polling(
-            drop_pending_updates=True  # Удаляет ожидающие обновления при запуске
-        )
+        # ЗАПУСК В РЕЖИМЕ POLLING
+        application.run_polling(drop_pending_updates=True)
         
     except Exception as e:
         logger.error(f"💥 Критическая ошибка: {e}")
