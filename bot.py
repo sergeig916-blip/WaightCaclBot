@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 
@@ -35,9 +36,8 @@ def set_user_max(user_id, exercise, value):
     if exercise == "тяга":
         USER_MAX_WEIGHTS[user_id]["становая"] = value
 
-# ========== ПОСТОЯННОЕ МЕНЮ (REPLY KEYBOARD) ==========
+# ========== ПОСТОЯННОЕ МЕНЮ ==========
 def get_main_keyboard():
-    """Создает постоянное меню внизу экрана"""
     keyboard = [
         [KeyboardButton("🏋️ НАЧАТЬ РАСЧЁТ"), KeyboardButton("📊 МАКСИМУМЫ")],
         [KeyboardButton("❓ ПОМОЩЬ"), KeyboardButton("ℹ️ О БОТЕ")]
@@ -45,7 +45,6 @@ def get_main_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
 
 def get_exercises_keyboard():
-    """Клавиатура для выбора упражнений"""
     keyboard = [
         [InlineKeyboardButton("🏋️ ЖИМ", callback_data='exercise_жим')],
         [InlineKeyboardButton("🦵 ПРИСЕД", callback_data='exercise_присед')],
@@ -55,7 +54,6 @@ def get_exercises_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_max_menu_keyboard():
-    """Меню для максимумов"""
     keyboard = [
         [InlineKeyboardButton("✏️ ИЗМЕНИТЬ ЖИМ", callback_data='change_жим')],
         [InlineKeyboardButton("✏️ ИЗМЕНИТЬ ПРИСЕД", callback_data='change_присед')],
@@ -118,7 +116,6 @@ def parse_workout_data(text):
 
 # ========== КОМАНДА /START ==========
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало работы с ботом"""
     welcome_text = (
         "🏋️ БОТ ДЛЯ РАСЧЕТА ВЕСОВ\n\n"
         "Используйте меню внизу для навигации:\n"
@@ -152,7 +149,6 @@ async def max_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== ОБРАБОТКА КНОПОК ПОСТОЯННОГО МЕНЮ ==========
 async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка нажатий кнопок постоянного меню"""
     text = update.message.text
     
     if text == "🏋️ НАЧАТЬ РАСЧЁТ":
@@ -241,24 +237,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_main_keyboard()
         )
     
-    # МЕНЮ МАКСИМУМОВ
-    elif data == 'menu_max':
-        жим_макс = get_user_max(user_id, "жим")
-        присед_макс = get_user_max(user_id, "присед")
-        тяга_макс = get_user_max(user_id, "тяга")
-        
-        max_text = (
-            f"🏋️ ВАШИ МАКСИМУМЫ:\n\n"
-            f"• Жим: {жим_макс} кг\n"
-            f"• Присед: {присед_макс} кг\n"
-            f"• Тяга: {тяга_макс} кг"
-        )
-        
-        await query.edit_message_text(
-            text=max_text,
-            reply_markup=get_max_menu_keyboard()
-        )
-    
     # ИНСТРУКЦИИ
     elif data == 'instructions':
         instructions_text = (
@@ -284,6 +262,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             text=instructions_text,
             reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    # МЕНЮ МАКСИМУМОВ
+    elif data == 'menu_max':
+        жим_макс = get_user_max(user_id, "жим")
+        присед_макс = get_user_max(user_id, "присед")
+        тяга_макс = get_user_max(user_id, "тяга")
+        
+        max_text = (
+            f"🏋️ ВАШИ МАКСИМУМЫ:\n\n"
+            f"• Жим: {жим_макс} кг\n"
+            f"• Присед: {присед_макс} кг\n"
+            f"• Тяга: {тяга_макс} кг"
+        )
+        
+        await query.edit_message_text(
+            text=max_text,
+            reply_markup=get_max_menu_keyboard()
         )
     
     # ИЗМЕНИТЬ МАКСИМУМ
@@ -496,15 +492,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== ОБРАБОТКА ОШИБОК ==========
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.error(f"Ошибка: {context.error}")
-    if update.callback_query:
-        await update.callback_query.answer("⚠️ Произошла ошибка. Попробуйте /start")
+    """Обработка ошибок"""
+    error_msg = str(context.error) if context.error else "Unknown error"
+    logger.error(f"Ошибка: {error_msg}")
+    
+    # Безопасная обработка - проверяем update на None
+    if update is None:
+        logger.error("Update is None, cannot handle error")
+        return
+    
+    try:
+        if update.callback_query:
+            await update.callback_query.answer("⚠️ Произошла ошибка. Попробуйте /start")
+        elif update.message:
+            await update.message.reply_text(
+                "⚠️ Произошла ошибка. Попробуйте /start",
+                reply_markup=get_main_keyboard()
+            )
+    except Exception as e:
+        logger.error(f"Ошибка в обработчике ошибок: {e}")
 
 # ========== ЗАПУСК БОТА ==========
 def main():
+    """Запуск бота на Railway"""
     logger.info("🚀 Запуск бота для расчета весов...")
     
+    # ПРИНУДИТЕЛЬНОЕ УДАЛЕНИЕ ВСЕХ WEBHOOK ПЕРЕД ЗАПУСКОМ
     try:
+        logger.info("🔄 Удаление старых webhook...")
+        response = requests.post(
+            f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
+            params={"drop_pending_updates": "true"}
+        )
+        if response.status_code == 200:
+            logger.info("✅ Старые webhook удалены")
+        else:
+            logger.warning(f"⚠️ Не удалось удалить webhook: {response.status_code}")
+    except Exception as e:
+        logger.warning(f"⚠️ Ошибка при удалении webhook: {e}")
+    
+    try:
+        # Создаем Application
         application = Application.builder().token(TOKEN).build()
         
         # Регистрируем обработчики В ПРАВИЛЬНОМ ПОРЯДКЕ
@@ -517,7 +545,7 @@ def main():
         # Обработка inline кнопок
         application.add_handler(CallbackQueryHandler(button_handler))
         
-        # Обработка ввода данных
+        # Обработка ввода данных (должен быть ПОСЛЕДНИМ!)
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         # Обработчик ошибок
@@ -525,11 +553,18 @@ def main():
         
         logger.info("✅ Бот запущен в режиме polling!")
         logger.info("📱 Постоянное меню настроено")
+        logger.info("🤖 Бот готов к работе!")
         
+        # ЗАПУСК В РЕЖИМЕ POLLING С ОПТИМИЗАЦИЕЙ
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
             drop_pending_updates=True,
-            poll_interval=1.0
+            poll_interval=2.0,  # Увеличенный интервал для предотвращения конфликтов
+            timeout=30,
+            read_timeout=10,
+            write_timeout=10,
+            connect_timeout=10,
+            pool_timeout=10
         )
         
     except Exception as e:
