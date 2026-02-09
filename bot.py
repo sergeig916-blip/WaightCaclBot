@@ -192,18 +192,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     if data == 'back_to_main':
-        # Удаляем сообщение с кнопками и показываем главное меню
         await query.delete_message()
         await context.bot.send_message(
             chat_id=user_id,
-            text="Используйте меню внизу для навигации:",
+            text="Главное меню",
             reply_markup=get_main_keyboard()
         )
     
     elif data == 'new_calculation':
-        # НОВЫЙ РАСЧЕТ - сразу показываем выбор упражнения
         await query.edit_message_text(
-            text="Выберите упражнение для нового расчета:",
+            text="Выберите упражнение:",
             reply_markup=get_exercises_keyboard()
         )
     
@@ -241,8 +239,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['awaiting_data'] = True
         context.user_data['awaiting_max_input'] = False
         
+        # Убрал текст про формат - просто ждем ввода данных
         exercise_name = {"жим": "ЖИМ ЛЕЖА", "присед": "ПРИСЕДАНИЕ", "тяга": "СТАНОВАЯ ТЯГА"}.get(exercise, "")
-        await query.edit_message_text(f"📝 Выбран: {exercise_name}\n\nВведите данные в формате:\n50-3;60-3-3;85-3-5")
+        await query.edit_message_text(f"📝 {exercise_name}")
     
     elif data == 'show_details':
         await show_calculation_details(update, context)
@@ -276,7 +275,6 @@ async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT
     
     details_text += f"\n⚙️ Округление до 2.5 кг"
     
-    # Измененные кнопки после деталей
     keyboard = [
         [InlineKeyboardButton("🔄 НОВЫЙ РАСЧЁТ", callback_data='new_calculation')],
         [InlineKeyboardButton("📊 МАКСИМУМЫ", callback_data='menu_max')],
@@ -322,16 +320,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         try:
+            # Сохраняем историю расчетов (не удаляем старые!)
             if user_id not in CALCULATION_HISTORY:
                 CALCULATION_HISTORY[user_id] = {}
+            
+            # Сохраняем новый расчет, сохраняя старые
             CALCULATION_HISTORY[user_id]['last_calculation'] = {
                 'exercise': exercise,
                 'max_weight': max_weight,
                 'workouts': workouts
             }
             
-            exercise_name = {"жим": "🏋️ ЖИМ ЛЕЖА", "присед": "🦵 ПРИСЕДАНИЕ", "тяга": "🏗️ СТАНОВАЯ ТЯГА"}.get(exercise, "")
-            
+            # Только результат расчета (без названия упражнения)
             result_parts = []
             for percent, reps, sets in workouts:
                 exact = max_weight * (percent / 100)
@@ -351,10 +351,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("🔙 НАЗАД В МЕНЮ", callback_data='back_to_main')]
             ]
             
-            # Отправляем результат и кнопки в одном сообщении
-            final_text = f"{exercise_name}\n{result_line}"
+            # Отправляем только результат и кнопки
             await update.message.reply_text(
-                final_text,
+                result_line,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
             
