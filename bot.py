@@ -2,7 +2,7 @@ import os
 import re
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes, ConversationHandler
 
 # ========== НАСТРОЙКИ ==========
 TOKEN = os.environ.get("BOT_TOKEN", "8514815854:AAH2CVbpxaPTTNtcdHj8j9lcbYa2zgBoVn8")
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # ========== ГЛОБАЛЬНЫЕ ДАННЫЕ ==========
 USER_MAX_WEIGHTS = {}
 CALCULATION_HISTORY = {}
+USER_FIRST_TIME = {}  # Для отслеживания новых пользователей
 
 def get_user_max(user_id, exercise):
     """Получить максимум пользователя или значение по умолчанию"""
@@ -128,13 +129,19 @@ def parse_workout_data(text):
 # ========== КОМАНДА /START ==========
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало работы с ботом"""
+    user_id = update.effective_user.id
+    
+    # Помечаем, что пользователь уже видел приветствие
+    USER_FIRST_TIME[user_id] = True
+    
     welcome_text = (
-        "🏋️ БОТ ДЛЯ РАСЧЕТА ВЕСОВ\n\n"
-        "Используйте меню внизу для навигации:\n"
+        "🏋️ БОТ ДЛЯ РАСЧЕТА ВЕСОВ В ПАУЭРЛИФТИНГЕ\n\n"
+        "🤖 Используйте меню внизу для навигации:\n\n"
         "• 🏋️ НАЧАТЬ РАСЧЁТ - выбрать упражнение\n"
         "• 📊 МАКСИМУМЫ - посмотреть/изменить максимумы\n"
         "• ❓ ПОМОЩЬ - инструкции по использованию\n"
-        "• ℹ️ О БОТЕ - информация о боте"
+        "• ℹ️ О БОТЕ - информация о боте\n\n"
+        "💪 Давайте начнем тренировку!"
     )
     
     await update.message.reply_text(
@@ -164,6 +171,10 @@ async def max_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка нажатий кнопок постоянного меню"""
     text = update.message.text
+    user_id = update.effective_user.id
+    
+    # Помечаем, что пользователь активен
+    USER_FIRST_TIME[user_id] = True
     
     if text == "🏋️ НАЧАТЬ РАСЧЁТ":
         await update.message.reply_text(
@@ -233,7 +244,7 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== ОБРАБОТКА ЛЮБЫХ СООБЩЕНИЙ БЕЗ КОМАНД ==========
 async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка любого сообщения без команды - предлагает /start"""
+    """Обработка любого сообщения без команды"""
     user_id = update.effective_user.id
     text = update.message.text.strip()
     
@@ -245,21 +256,35 @@ async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if text in ["🏋️ НАЧАТЬ РАСЧЁТ", "📊 МАКСИМУМЫ", "❓ ПОМОЩЬ", "ℹ️ О БОТЕ"]:
         return
     
-    # Показываем приветствие
-    welcome_text = (
-        "👋 Привет!\n\n"
-        "🤖 Я бот для расчета рабочих весов в пауэрлифтинге.\n\n"
-        "Чтобы начать работу, нажмите /start\n"
-        "Или используйте меню внизу экрана:\n"
+    # ЕСЛИ ПОЛЬЗОВАТЕЛЬ НОВЫЙ - показываем приветствие
+    if user_id not in USER_FIRST_TIME:
+        welcome_text = (
+            "👋 Привет!\n\n"
+            "🤖 Я бот для расчета рабочих весов в пауэрлифтинге.\n\n"
+            "Для начала работы нажмите /start\n"
+            "Или используйте меню внизу экрана:"
+        )
+        
+        await update.message.reply_text(
+            welcome_text,
+            reply_markup=get_main_keyboard()
+        )
+        
+        # Помечаем, что пользователь уже видел приветствие
+        USER_FIRST_TIME[user_id] = True
+        return
+    
+    # ЕСЛИ ПОЛЬЗОВАТЕЛЬ УЖЕ ЗНАКОМ С БОТОМ - показываем меню
+    menu_text = (
+        "📱 Используйте меню внизу для навигации:\n\n"
         "• 🏋️ НАЧАТЬ РАСЧЁТ - выбрать упражнение\n"
         "• 📊 МАКСИМУМЫ - посмотреть/изменить максимумы\n"
         "• ❓ ПОМОЩЬ - инструкции по использованию\n"
-        "• ℹ️ О БОТЕ - информация о боте\n\n"
-        "💪 Давайте начнем тренировку!"
+        "• ℹ️ О БОТЕ - информация о боте"
     )
     
     await update.message.reply_text(
-        welcome_text,
+        menu_text,
         reply_markup=get_main_keyboard()
     )
 
@@ -269,17 +294,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     user_id = query.from_user.id
+    
+    # Помечаем пользователя как активного
+    USER_FIRST_TIME[user_id] = True
+    
     data = query.data
     
     # НАЗАД В ГЛАВНОЕ МЕНЮ
     if data == 'back_to_main':
         await query.edit_message_text(
-            text="Используйте меню внизу для навигации:",
+            text="Главное меню:",
             reply_markup=None
         )
         await context.bot.send_message(
             chat_id=user_id,
-            text="Главное меню:",
+            text="Используйте меню внизу для навигации:",
             reply_markup=get_main_keyboard()
         )
     
@@ -378,6 +407,9 @@ async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT
     
     user_id = query.from_user.id
     
+    # Помечаем пользователя как активного
+    USER_FIRST_TIME[user_id] = True
+    
     if user_id not in CALCULATION_HISTORY or 'last_calculation' not in CALCULATION_HISTORY[user_id]:
         await query.edit_message_text(
             text="❌ Нет данных о последнем расчете. Сначала сделайте расчет.",
@@ -428,6 +460,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода данных для расчета"""
     user_id = update.effective_user.id
     text = update.message.text.strip()
+    
+    # Помечаем пользователя как активного
+    USER_FIRST_TIME[user_id] = True
     
     # ЕСЛИ ВВОДИМ НОВЫЙ МАКСИМУМ
     if context.user_data.get('awaiting_max_input'):
