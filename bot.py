@@ -45,7 +45,7 @@ def get_exercises_keyboard():
         [InlineKeyboardButton("🏋️ ЖИМ", callback_data='exercise_жим')],
         [InlineKeyboardButton("🦵 ПРИСЕД", callback_data='exercise_присед')],
         [InlineKeyboardButton("🏗️ ТЯГА", callback_data='exercise_тяга')],
-        [InlineKeyboardButton("🔙 НАЗАД", callback_data='back_to_main')]
+        [InlineKeyboardButton("🔙 НАЗАД В МЕНЮ", callback_data='back_to_main')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -55,7 +55,7 @@ def get_max_menu_keyboard():
         [InlineKeyboardButton("✏️ ИЗМЕНИТЬ ПРИСЕД", callback_data='change_присед')],
         [InlineKeyboardButton("✏️ ИЗМЕНИТЬ ТЯГУ", callback_data='change_тяга')],
         [InlineKeyboardButton("📖 ИНСТРУКЦИИ", callback_data='instructions')],
-        [InlineKeyboardButton("🔙 НАЗАД", callback_data='back_to_main')]
+        [InlineKeyboardButton("🔙 НАЗАД В МЕНЮ", callback_data='back_to_main')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -183,10 +183,6 @@ async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=get_main_keyboard()
         )
         USER_FIRST_TIME[user_id] = True
-        return
-    
-    # УБРАЛ ЭТО СООБЩЕНИЕ ВООБЩЕ
-    # Пользователь просто видит меню внизу и всё
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -196,11 +192,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     if data == 'back_to_main':
+        # Удаляем сообщение с кнопками и показываем главное меню
         await query.delete_message()
         await context.bot.send_message(
             chat_id=user_id,
-            text="Главное меню",
+            text="Используйте меню внизу для навигации:",
             reply_markup=get_main_keyboard()
+        )
+    
+    elif data == 'new_calculation':
+        # НОВЫЙ РАСЧЕТ - сразу показываем выбор упражнения
+        await query.edit_message_text(
+            text="Выберите упражнение для нового расчета:",
+            reply_markup=get_exercises_keyboard()
         )
     
     elif data == 'instructions':
@@ -271,10 +275,14 @@ async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT
             details_text += f"{i}. {percent}% = {exact:.1f} кг → {rounded} кг ({reps}×{sets})\n"
     
     details_text += f"\n⚙️ Округление до 2.5 кг"
+    
+    # Измененные кнопки после деталей
     keyboard = [
-        [InlineKeyboardButton("🔄 НОВЫЙ РАСЧЁТ", callback_data='back_to_main')],
-        [InlineKeyboardButton("📊 МАКСИМУМЫ", callback_data='menu_max')]
+        [InlineKeyboardButton("🔄 НОВЫЙ РАСЧЁТ", callback_data='new_calculation')],
+        [InlineKeyboardButton("📊 МАКСИМУМЫ", callback_data='menu_max')],
+        [InlineKeyboardButton("🔙 НАЗАД В МЕНЮ", callback_data='back_to_main')]
     ]
+    
     await query.edit_message_text(text=details_text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -335,11 +343,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             result_line = "; ".join(result_parts)
             
-            # Теперь отправляем ВСЁ В ОДНОМ сообщении
+            # Кнопки после расчета
             keyboard = [
-                [InlineKeyboardButton("🔄 НОВЫЙ РАСЧЁТ", callback_data='back_to_main')],
+                [InlineKeyboardButton("🔄 НОВЫЙ РАСЧЁТ", callback_data='new_calculation')],
                 [InlineKeyboardButton("🔍 ДЕТАЛИ/ОКРУГЛЕНИЯ", callback_data='show_details')],
-                [InlineKeyboardButton("📊 ИЗМЕНИТЬ МАКСИМУМЫ", callback_data='menu_max')]
+                [InlineKeyboardButton("📊 ИЗМЕНИТЬ МАКСИМУМЫ", callback_data='menu_max')],
+                [InlineKeyboardButton("🔙 НАЗАД В МЕНЮ", callback_data='back_to_main')]
             ]
             
             # Отправляем результат и кнопки в одном сообщении
