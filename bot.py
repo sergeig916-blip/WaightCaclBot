@@ -4,23 +4,19 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
 
-# ========== НАСТРОЙКИ ==========
 TOKEN = os.environ.get("BOT_TOKEN", "8514815854:AAH2CVbpxaPTTNtcdHj8j9lcbYa2zgBoVn8")
 
-# ========== ЛОГИРОВАНИЕ ==========
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# ========== ГЛОБАЛЬНЫЕ ДАННЫЕ ==========
 USER_MAX_WEIGHTS = {}
 CALCULATION_HISTORY = {}
 USER_FIRST_TIME = {}
 
 def get_user_max(user_id, exercise):
-    """Получить максимум пользователя или значение по умолчанию"""
     if user_id not in USER_MAX_WEIGHTS:
         USER_MAX_WEIGHTS[user_id] = {
             "жим": 117.5,
@@ -31,14 +27,12 @@ def get_user_max(user_id, exercise):
     return USER_MAX_WEIGHTS[user_id].get(exercise, 100)
 
 def set_user_max(user_id, exercise, value):
-    """Установить максимум пользователя"""
     if user_id not in USER_MAX_WEIGHTS:
         USER_MAX_WEIGHTS[user_id] = {}
     USER_MAX_WEIGHTS[user_id][exercise] = value
     if exercise == "тяга":
         USER_MAX_WEIGHTS[user_id]["становая"] = value
 
-# ========== ПОСТОЯННОЕ МЕНЮ ==========
 def get_main_keyboard():
     keyboard = [
         [KeyboardButton("🏋️ НАЧАТЬ РАСЧЁТ"), KeyboardButton("📊 МАКСИМУМЫ")],
@@ -65,7 +59,6 @@ def get_max_menu_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# ========== ПАРСЕР ==========
 def parse_workout_data(text):
     text = text.strip()
     parts = [p.strip() for p in text.split(';') if p.strip()]
@@ -116,7 +109,6 @@ def parse_workout_data(text):
     
     return results
 
-# ========== КОМАНДЫ ==========
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     USER_FIRST_TIME[user_id] = True
@@ -127,8 +119,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• 🏋️ НАЧАТЬ РАСЧЁТ - выбрать упражнение\n"
         "• 📊 МАКСИМУМЫ - посмотреть/изменить максимумы\n"
         "• ❓ ПОМОЩЬ - инструкции по использованию\n"
-        "• ℹ️ О БОТЕ - информация о боте\n\n"
-        "💪 Давайте начнем тренировку!"
+        "• ℹ️ О БОТЕ - информация о боте"
     )
     
     await update.message.reply_text(welcome_text, reply_markup=get_main_keyboard())
@@ -140,12 +131,10 @@ async def max_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     тяга_макс = get_user_max(user_id, "тяга")
     
     await update.message.reply_text(
-        f"🏋️ ВАШИ МАКСИМУМЫ:\n\n• Жим: {жим_макс} кг\n• Присед: {присед_макс} кг\n• Тяга: {тяга_макс} кг\n\n"
-        f"Изменить можно через меню 📊 МАКСИМУМЫ",
+        f"🏋️ ВАШИ МАКСИМУМЫ:\n\n• Жим: {жим_макс} кг\n• Присед: {присед_макс} кг\n• Тяга: {тяга_макс} кг",
         reply_markup=get_main_keyboard()
     )
 
-# ========== ОБРАБОТКА КНОПОК МЕНЮ ==========
 async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.effective_user.id
@@ -176,12 +165,10 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🤖 БОТ ДЛЯ РАСЧЕТА ВЕСОВ В ПАУЭРЛИФТИНГЕ\n\n"
             "⚙️ Функционал:\n• Расчет рабочих весов по % от максимума\n• Округление до ближайших 2.5 кг\n"
             "• Поддержка 3х упражнений: жим, присед, тяга\n• Индивидуальные максимумы для каждого пользователя\n\n"
-            "📱 Использование:\n1. Выберите упражнение\n2. Введите данные в формате: 50-3;60-3-3\n3. Получите результат\n\n"
-            "💪 Удачных тренировок!"
+            "📱 Использование:\n1. Выберите упражнение\n2. Введите данные в формате: 50-3;60-3-3\n3. Получите результат"
         )
         await update.message.reply_text(about_text, reply_markup=get_main_keyboard())
 
-# ========== ОБРАБОТКА ЛЮБЫХ СООБЩЕНИЙ ==========
 async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
@@ -192,19 +179,15 @@ async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if user_id not in USER_FIRST_TIME:
         await update.message.reply_text(
             "👋 Привет!\n\n🤖 Я бот для расчета рабочих весов в пауэрлифтинге.\n\n"
-            "Для начала работы нажмите /start\nИли используйте меню внизу экрана:",
+            "Для начала работы нажмите /start",
             reply_markup=get_main_keyboard()
         )
         USER_FIRST_TIME[user_id] = True
         return
     
-    await update.message.reply_text(
-        "📱 Используйте меню внизу для навигации:\n\n• 🏋️ НАЧАТЬ РАСЧЁТ - выбрать упражнение\n"
-        "• 📊 МАКСИМУМЫ - посмотреть/изменить максимумы\n• ❓ ПОМОЩЬ - инструкции\n• ℹ️ О БОТЕ - информация",
-        reply_markup=get_main_keyboard()
-    )
+    # УБРАЛ ЭТО СООБЩЕНИЕ ВООБЩЕ
+    # Пользователь просто видит меню внизу и всё
 
-# ========== INLINE КНОПКИ ==========
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -213,8 +196,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     if data == 'back_to_main':
-        await query.edit_message_text(text="Главное меню:", reply_markup=None)
-        await context.bot.send_message(chat_id=user_id, text="Используйте меню внизу:", reply_markup=get_main_keyboard())
+        await query.delete_message()
+        await context.bot.send_message(
+            chat_id=user_id,
+            text="Главное меню",
+            reply_markup=get_main_keyboard()
+        )
     
     elif data == 'instructions':
         instructions_text = (
@@ -256,7 +243,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == 'show_details':
         await show_calculation_details(update, context)
 
-# ========== ДЕТАЛИ РАСЧЕТА ==========
 async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -291,13 +277,11 @@ async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT
     ]
     await query.edit_message_text(text=details_text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ========== ОБРАБОТКА ВВОДА ДАННЫХ ==========
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
     USER_FIRST_TIME[user_id] = True
     
-    # ВВОД МАКСИМУМА
     if context.user_data.get('awaiting_max_input'):
         exercise = context.user_data.get('changing_exercise')
         try:
@@ -320,7 +304,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Неверный формат! Введите число (например: 120 или 122.5):")
         return
     
-    # ВВОД ДАННЫХ ДЛЯ РАСЧЕТА
     if context.user_data.get('awaiting_data'):
         exercise = context.user_data.get('current_exercise')
         max_weight = get_user_max(user_id, exercise)
@@ -331,7 +314,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         try:
-            # Сохраняем историю
             if user_id not in CALCULATION_HISTORY:
                 CALCULATION_HISTORY[user_id] = {}
             CALCULATION_HISTORY[user_id]['last_calculation'] = {
@@ -340,10 +322,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'workouts': workouts
             }
             
-            # Название упражнения
             exercise_name = {"жим": "🏋️ ЖИМ ЛЕЖА", "присед": "🦵 ПРИСЕДАНИЕ", "тяга": "🏗️ СТАНОВАЯ ТЯГА"}.get(exercise, "")
             
-            # Результаты расчета
             result_parts = []
             for percent, reps, sets in workouts:
                 exact = max_weight * (percent / 100)
@@ -355,19 +335,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             result_line = "; ".join(result_parts)
             
-            # Отправляем ВСЕ в одном сообщении
-            final_text = f"{exercise_name}\n{result_line}"
-            await update.message.reply_text(final_text)
-            
-            # Только кнопки - БЕЗ ТЕКСТА
+            # Теперь отправляем ВСЁ В ОДНОМ сообщении
             keyboard = [
                 [InlineKeyboardButton("🔄 НОВЫЙ РАСЧЁТ", callback_data='back_to_main')],
                 [InlineKeyboardButton("🔍 ДЕТАЛИ/ОКРУГЛЕНИЯ", callback_data='show_details')],
                 [InlineKeyboardButton("📊 ИЗМЕНИТЬ МАКСИМУМЫ", callback_data='menu_max')]
             ]
             
-            # Отправляем только клавиатуру
-            await update.message.reply_text("", reply_markup=InlineKeyboardMarkup(keyboard))
+            # Отправляем результат и кнопки в одном сообщении
+            final_text = f"{exercise_name}\n{result_line}"
+            await update.message.reply_text(
+                final_text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
             
             context.user_data['awaiting_data'] = False
             
@@ -375,24 +355,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Ошибка расчета: {e}")
             await update.message.reply_text("❌ Ошибка расчета. Проверьте формат данных.", reply_markup=get_main_keyboard())
 
-# ========== ОШИБКИ ==========
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Ошибка: {context.error}")
-    try:
-        if update and update.callback_query:
-            await update.callback_query.answer("⚠️ Произошла ошибка. Попробуйте /start")
-        elif update and update.message:
-            await update.message.reply_text("⚠️ Произошла ошибка. Попробуйте /start", reply_markup=get_main_keyboard())
-    except Exception as e:
-        logger.error(f"Ошибка в обработчике ошибок: {e}")
 
-# ========== ЗАПУСК ==========
 def main():
     logger.info("🚀 Запуск бота...")
     try:
         application = Application.builder().token(TOKEN).build()
         
-        # ОБРАБОТЧИКИ
         application.add_handler(CommandHandler("start", start_command))
         application.add_handler(CommandHandler("max", max_command))
         application.add_handler(MessageHandler(filters.Regex("^(🏋️ НАЧАТЬ РАСЧЁТ|📊 МАКСИМУМЫ|❓ ПОМОЩЬ|ℹ️ О БОТЕ)$"), handle_main_menu))
