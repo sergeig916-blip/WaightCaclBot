@@ -44,7 +44,7 @@ def get_main_keyboard():
         [KeyboardButton("🏋️ НАЧАТЬ РАСЧЁТ"), KeyboardButton("📊 МАКСИМУМЫ")],
         [KeyboardButton("❓ ПОМОЩЬ"), KeyboardButton("ℹ️ О БОТЕ")]
     ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
 
 def get_exercises_keyboard():
     """Клавиатура для выбора упражнений"""
